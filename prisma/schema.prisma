@@ -1,0 +1,46 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Resource {
+  id              String   @id @default(uuid())
+  title           String
+  url             String   @unique
+  type            String   // video, article, repo, course, tutorial, documentation, interactive
+  difficulty      String   // beginner, intermediate, advanced, expert
+  duration        String?  // estimated time e.g. "35 minutes"
+  tags            String[] // skill categories e.g. ["web-development", "react", "javascript"]
+  source          String   // YouTube, GitHub, Medium, Dev.to, freeCodeCamp, MDN, etc.
+  summary         String?  // AI-generated summary of the content
+  qualityScore    Float    @default(0.5)
+  popularityScore Float    @default(0.5)
+  recencyScore    Float    @default(0.5)
+  embedding       Unsupported("vector(384)")? // pgvector embedding
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([type])
+  @@index([difficulty])
+  @@index([source])
+  @@map("resources")
+}
+
+model UserProfile {
+  id                   String   @id @default(uuid())
+  skill                String
+  contentPreferences   String[] @map("content_preferences")
+  learningPace         String   @map("learning_pace")
+  sessionLength        String   @map("session_length")
+  difficultyPreference String   @map("difficulty_preference")
+  proficiencyScore     Float    @map("proficiency_score")
+  createdAt            DateTime @default(now())
+
+  @@map("user_profiles")
+}
