@@ -3,6 +3,7 @@ import cors from "cors";
 import rateLimit from "express-rate-limit";
 import { config } from "./config/environment";
 import { recommendationRouter } from "./api/recommendations";
+import { userProfileRouter } from "./api/userProfileRouter";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(limiter);
 
 // ── Routes ─────────────────────────────────────────────────
 app.use("/api", recommendationRouter);
+app.use("/api", userProfileRouter);
 
 // Health check
 app.get("/health", (_req, res) => {
