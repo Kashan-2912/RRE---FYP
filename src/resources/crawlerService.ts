@@ -28,7 +28,8 @@ export interface RawResource {
  */
 export async function crawlYouTube(
   skill: string,
-  maxResults: number = 20
+  maxResults: number = 20,
+  videoDuration: "any" | "short" | "medium" | "long" = "any"
 ): Promise<RawResource[]> {
   if (!config.youtubeApiKey) {
     console.log("⚠️  No YOUTUBE_API_KEY set, skipping YouTube crawl");
@@ -44,7 +45,7 @@ export async function crawlYouTube(
         type: "video",
         maxResults,
         relevanceLanguage: "en",
-        videoDuration: "medium",
+        videoDuration,
         key: config.youtubeApiKey,
       },
     });
@@ -320,12 +321,19 @@ function estimateReadingTime(content: string): string {
  */
 export async function crawlAllSources(
   skill: string,
-  maxPerSource: number = 15
+  maxPerSource: number = 15,
+  sessionLength: string = "regular"
 ): Promise<RawResource[]> {
-  console.log(`\n🕷️  Crawling all sources for: "${skill}"`);
+  console.log(`\n🕷️  Crawling all sources for: "${skill}" (Session: ${sessionLength})`);
+
+  // Map session length to YouTube duration filter
+  let ytDuration: "short" | "medium" | "long" | "any" = "medium";
+  if (sessionLength === "short") ytDuration = "short";
+  else if (sessionLength === "regular") ytDuration = "medium";
+  else if (sessionLength === "dedicated") ytDuration = "long";
 
   const results = await Promise.allSettled([
-    crawlYouTube(skill, maxPerSource),
+    crawlYouTube(skill, maxPerSource, ytDuration),
     crawlGitHub(skill, maxPerSource),
     crawlDevTo(skill, maxPerSource),
     crawlMedium(skill, Math.min(maxPerSource, 10)),

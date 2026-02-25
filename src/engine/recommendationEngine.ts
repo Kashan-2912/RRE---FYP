@@ -16,6 +16,7 @@ import { generateEmbedding, buildQueryText } from "../vector/embeddingService";
 import { searchSimilarResources, VectorSearchFilters } from "../vector/vectorSearch";
 import { getDifficultyMix, DifficultyMix } from "./difficultyMapper";
 import { rankResources, RankedResource } from "./rankingEngine";
+import { calculateFormatMatchScore, calculateRecencyScore, clamp, isSessionLengthCompatible } from "../utils/scoring";
 import { config } from "../config/environment";
 
 // ── Types ──────────────────────────────────────────────────
@@ -93,35 +94,6 @@ function generateExplanation(
   return "Recommended because it " + reasons.join(", ") + ".";
 }
 
-// ── Session Duration Filtering ─────────────────────────────
-
-function parseDurationMinutes(duration: string | null): number | null {
-  if (!duration) return null;
-  const match = duration.match(/(\d+)\s*min/i);
-  if (match) return parseInt(match[1], 10);
-  const hourMatch = duration.match(/(\d+)\s*hour/i);
-  if (hourMatch) return parseInt(hourMatch[1], 10) * 60;
-  return null;
-}
-
-function isSessionLengthCompatible(
-  duration: string | null,
-  sessionLength: string
-): boolean {
-  const minutes = parseDurationMinutes(duration);
-  if (minutes === null) return true; // no duration info, don't filter
-
-  switch (sessionLength) {
-    case "short":
-      return minutes <= 20;
-    case "regular":
-      return minutes <= 60;
-    case "dedicated":
-      return true; // any length is fine
-    default:
-      return true;
-  }
-}
 
 // ── Main Recommendation Function ───────────────────────────
 
@@ -135,9 +107,9 @@ export async function generateRecommendations(
   console.log(`   Preferences: ${input.content_preferences.join(", ")}`);
   console.log(`   Proficiency: ${input.proficiency_score}/10`);
 
-  // 1. Map proficiency to difficulty distribution
-  const difficultyMix = getDifficultyMix(input.proficiency_score);
-  console.log(`   Primary difficulty: ${difficultyMix.primary}`);
+  // 1. Map proficiency to difficulty distribution with learning pace
+  const difficultyMix = getDifficultyMix(input.proficiency_score, input.learning_pace);
+  console.log(`   Primary difficulty: ${difficultyMix.primary} (Pace: ${input.learning_pace})`);
 
   // 2. Build query text for semantic search
   const queryText = buildQueryText({
@@ -179,8 +151,17 @@ export async function generateRecommendations(
     config.topN
   );
 
-  // 7. Generate explanations and format output
-  const results: RecommendationOutput[] = ranked.map((resource) => ({
+  // 7. Filter by session length compatibility (strict filtering)
+  const filtered = ranked.filter((resource) => 
+    isSessionLengthCompatible(resource.duration, input.session_length)
+  );
+  console.log(`   Filtered ${ranked.length} -> ${filtered.length} resources based on session length: ${input.session_length}`);
+
+  // 8. Generate explanations and format output
+  // If strict filtering removed everything, fall back to top ranked results but show only 5
+  const finalCandidates = filtered.length > 0 ? filtered : ranked.slice(0, 5);
+  
+  const results: RecommendationOutput[] = finalCandidates.map((resource) => ({
     title: resource.title,
     type: resource.type,
     url: resource.url,

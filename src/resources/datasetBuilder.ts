@@ -42,12 +42,13 @@ export interface DatasetBuildResult {
  */
 export async function buildDatasetForSkill(
   skill: string,
-  maxPerSource: number = 15
+  maxPerSource: number = 15,
+  sessionLength: string = "regular"
 ): Promise<DatasetBuildResult> {
-  console.log(`\n━━━ Building dataset for: ${skill} ━━━`);
+  console.log(`\n━━━ Building dataset for: ${skill} (Session: ${sessionLength}) ━━━`);
 
   // Step 1: Crawl all sources
-  const rawResources: RawResource[] = await crawlAllSources(skill, maxPerSource);
+  const rawResources: RawResource[] = await crawlAllSources(skill, maxPerSource, sessionLength);
 
   // Step 2: Process and extract structured content
   const processed: ProcessedResource[] = rawResources.map(processResource);
@@ -97,7 +98,7 @@ export async function buildFullDataset(
   const results: DatasetBuildResult[] = [];
 
   for (const skill of skills) {
-    const result = await buildDatasetForSkill(skill, maxPerSource);
+    const result = await buildDatasetForSkill(skill, maxPerSource, "regular"); // Default to regular for full build
     results.push(result);
   }
 

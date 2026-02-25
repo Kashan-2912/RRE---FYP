@@ -27,16 +27,20 @@ export function mapProficiencyToLevel(score: number): DifficultyLevel {
 }
 
 /**
- * Get the recommended difficulty distribution mix based on proficiency score.
+ * Get the recommended difficulty distribution mix based on proficiency score and learning pace.
  *
  * The primary level gets 60%, one level down gets 30%, and one level up gets 10%.
  * This ensures the user gets mostly appropriately-challenging content with some
  * review material and stretch goals.
+ *
+ * Learning Pace Adjustments:
+ *   - "slow": Shifts weight toward simpler content (review).
+ *   - "fast": Shifts weight toward more challenging content (stretch goals).
  */
-export function getDifficultyMix(score: number): DifficultyMix {
+export function getDifficultyMix(score: number, pace: string = "medium"): DifficultyMix {
   const primary = mapProficiencyToLevel(score);
 
-  const mixes: Record<DifficultyLevel, Record<DifficultyLevel, number>> = {
+  const baseMixes: Record<DifficultyLevel, Record<DifficultyLevel, number>> = {
     beginner: {
       beginner: 0.70,
       intermediate: 0.25,
@@ -63,9 +67,42 @@ export function getDifficultyMix(score: number): DifficultyMix {
     },
   };
 
+  const distribution = { ...baseMixes[primary] };
+
+  // Adjust distribution based on learning pace
+  if (pace === "slow") {
+    // Shift 15% from stretch/on-target to review
+    if (primary === "intermediate") {
+      distribution.beginner += 0.15;
+      distribution.intermediate -= 0.10;
+      distribution.advanced -= 0.05;
+    } else if (primary === "advanced") {
+      distribution.intermediate += 0.15;
+      distribution.advanced -= 0.10;
+      distribution.expert -= 0.05;
+    } else if (primary === "expert") {
+      distribution.advanced += 0.15;
+      distribution.expert -= 0.15;
+    }
+  } else if (pace === "fast") {
+    // Shift 15% from review/on-target to stretch
+    if (primary === "beginner") {
+      distribution.intermediate += 0.15;
+      distribution.beginner -= 0.15;
+    } else if (primary === "intermediate") {
+      distribution.advanced += 0.15;
+      distribution.intermediate -= 0.10;
+      distribution.beginner -= 0.05;
+    } else if (primary === "advanced") {
+      distribution.expert += 0.15;
+      distribution.advanced -= 0.10;
+      distribution.intermediate -= 0.05;
+    }
+  }
+
   return {
     primary,
-    distribution: mixes[primary],
+    distribution,
   };
 }
 

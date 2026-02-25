@@ -63,3 +63,38 @@ export function calculateFormatMatchScore(
   }
   return 0.2;
 }
+
+/**
+ * Check if a resource duration is compatible with the user's session length preference.
+ * @param duration String duration (e.g., "15:20" for videos, or null)
+ * @param sessionLength "short" (0-10m), "regular" (10-30m), "dedicated" (>30m)
+ */
+export function isSessionLengthCompatible(
+  duration: string | null,
+  sessionLength: string
+): boolean {
+  if (!duration) return true; // Default to compatible if no duration info
+
+  // Try to parse duration (expecting format like MM:SS or HH:MM:SS)
+  const parts = duration.split(":").map(Number);
+  let totalMinutes = 0;
+  
+  if (parts.length === 2) {
+    totalMinutes = parts[0];
+  } else if (parts.length === 3) {
+    totalMinutes = parts[0] * 60 + parts[1];
+  } else {
+    return true; // Unrecognized format, don't filter it out
+  }
+
+
+  if (sessionLength === "short") {
+    return totalMinutes <= 10;
+  } else if (sessionLength === "regular") {
+    return totalMinutes >= 5 && totalMinutes <= 45;
+  } else if (sessionLength === "dedicated") {
+    return totalMinutes >= 20;
+  }
+
+  return true;
+}
