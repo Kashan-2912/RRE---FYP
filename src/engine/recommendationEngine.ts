@@ -18,6 +18,7 @@ import { getDifficultyMix, DifficultyMix } from "./difficultyMapper";
 import { rankResources, RankedResource } from "./rankingEngine";
 import { calculateFormatMatchScore, calculateRecencyScore, clamp, isSessionLengthCompatible } from "../utils/scoring";
 import { config } from "../config/environment";
+import prisma from "../config/database";
 
 // ── Types ──────────────────────────────────────────────────
 
@@ -94,7 +95,6 @@ function generateExplanation(
   return "Recommended because it " + reasons.join(", ") + ".";
 }
 
-
 // ── Main Recommendation Function ───────────────────────────
 
 /**
@@ -104,8 +104,9 @@ export async function generateRecommendations(
   input: RecommendationInput
 ): Promise<RecommendationOutput[]> {
   console.log(`\n🔍 Generating recommendations for: ${input.skill_selected}`);
-  console.log(`   Preferences: ${input.content_preferences.join(", ")}`);
-  console.log(`   Proficiency: ${input.proficiency_score}/10`);
+  
+  const skillTag = input.skill_selected.toLowerCase().trim();
+
 
   // 1. Map proficiency to difficulty distribution with learning pace
   const difficultyMix = getDifficultyMix(input.proficiency_score, input.learning_pace);
@@ -117,13 +118,14 @@ export async function generateRecommendations(
     contentPreferences: input.content_preferences,
     difficultyPreference: input.difficulty_preference,
   });
-  console.log(`   Query: "${queryText}"`);
 
   // 3. Generate query embedding
   const queryEmbedding = await generateEmbedding(queryText);
 
-  // 4. Build filters (retrieve broadly, then rank)
-  const filters: VectorSearchFilters = {};
+  // 4. Build filters (Strictly filter by the selected skill tag)
+  const filters: VectorSearchFilters = {
+    tags: [skillTag]
+  };
 
   // Retrieve more candidates than needed so ranking has room to work
   const candidateLimit = config.topN * 5;
@@ -134,10 +136,10 @@ export async function generateRecommendations(
     candidateLimit,
     filters
   );
-  console.log(`   Found ${candidates.length} candidates from vector search`);
+  console.log(`   Found ${candidates.length} candidates for skill: ${skillTag}`);
 
   if (candidates.length === 0) {
-    console.log("   ⚠️ No resources found. Please run the ingestion pipeline first.");
+    console.log("   ❌ No resources found even after discovery.");
     return [];
   }
 

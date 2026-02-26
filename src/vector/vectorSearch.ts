@@ -71,6 +71,12 @@ export async function searchSimilarResources(
     paramIndex++;
   }
 
+  if (filters?.tags?.length) {
+    conditions.push(`tags && $${paramIndex}::text[]`);
+    params.push(filters.tags);
+    paramIndex++;
+  }
+
   const whereClause = conditions.join(" AND ");
 
   // Query with cosine distance

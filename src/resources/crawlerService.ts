@@ -77,7 +77,7 @@ export async function crawlYouTube(
         type: "video",
         source: "YouTube",
         description: item.snippet.description,
-        tags: [skill.toLowerCase().replace(/\s+/g, "-")],
+        tags: [skill.toLowerCase().trim()],
         publishedAt: item.snippet.publishedAt,
         duration,
         metadata: { viewCount, channelTitle: item.snippet.channelTitle },
@@ -124,8 +124,8 @@ export async function crawlGitHub(
       source: "GitHub",
       description: repo.description || "",
       tags: [
-        skill.toLowerCase().replace(/\s+/g, "-"),
-        ...(repo.topics || []).slice(0, 5),
+        skill.toLowerCase().trim(),
+        ...filterIrrelevantTags(repo.topics || []).slice(0, 5),
       ],
       publishedAt: repo.created_at,
       metadata: {
@@ -165,8 +165,8 @@ export async function crawlDevTo(
       source: "Dev.to",
       description: article.description,
       tags: [
-        skill.toLowerCase().replace(/\s+/g, "-"),
-        ...(article.tag_list || []),
+        skill.toLowerCase().trim(),
+        ...(article.tag_list || []).map((t: string) => t.toLowerCase()),
       ],
       publishedAt: article.published_at,
       duration: `${article.reading_time_minutes} minutes`,
@@ -204,7 +204,7 @@ export async function crawlMedium(
       type: "article",
       source: "Medium",
       description: stripHtml(item.description || "").slice(0, 500),
-      tags: [skill.toLowerCase().replace(/\s+/g, "-")],
+      tags: [skill.toLowerCase().trim()],
       publishedAt: item.pubDate,
       duration: estimateReadingTime(item.content || item.description || ""),
       metadata: { author: item.author },
@@ -246,7 +246,7 @@ export async function crawlFreeCodeCamp(
       type: "tutorial",
       source: "freeCodeCamp",
       description: post.excerpt || "",
-      tags: [skill.toLowerCase().replace(/\s+/g, "-")],
+      tags: [skill.toLowerCase().trim()],
       publishedAt: post.published_at,
       duration: `${post.reading_time || 5} minutes`,
     }));
@@ -282,7 +282,7 @@ export async function crawlMDN(
       type: "documentation",
       source: "MDN",
       description: doc.summary || "",
-      tags: [skill.toLowerCase().replace(/\s+/g, "-"), "web-development"],
+      tags: [skill.toLowerCase().trim(), "web-development"],
       duration: "10 minutes",
     }));
   } catch (error: any) {
@@ -314,6 +314,14 @@ function estimateReadingTime(content: string): string {
   const words = text.split(/\s+/).length;
   const minutes = Math.max(1, Math.ceil(words / 200));
   return `${minutes} minutes`;
+}
+
+/** Filter out potentially irrelevant or messy tags */
+function filterIrrelevantTags(tags: string[]): string[] {
+  const blacklist = ["awesome", "list", "github", "collection", "programming"];
+  return tags
+    .map(t => t.toLowerCase())
+    .filter(t => t.length > 2 && !blacklist.includes(t));
 }
 
 /**
