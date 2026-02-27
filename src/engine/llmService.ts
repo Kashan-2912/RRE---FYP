@@ -100,8 +100,20 @@ Create a comprehensive, granular learning roadmap for: "${input.skill}"
 ### Structure
 1. **Master Nodes** = major milestones/phases in the learning journey, ordered sequentially. A learner completes phase 1 before phase 2.
 2. **Slave Nodes** = specific, atomic concepts within each phase. Each slave node teaches ONE focused thing.
-3. You MUST generate AT LEAST 6 master nodes and AT MOST 12. Each master node MUST have AT LEAST 3 slave nodes and AT MOST 8. The roadmap must be COMPREHENSIVE — cover the ENTIRE skill from fundamentals to advanced topics, not just a handful of concepts.
-4. IMPORTANT: The roadmap should cover ALL major areas of the skill. For example, for NextJS you must cover: project setup, pages/routing, components, data fetching, SSR/SSG/ISR, API routes, styling, middleware, authentication, deployment, testing, performance, etc. Do NOT skip major areas.
+3. You MUST generate AT LEAST 6 master nodes and AT MOST 12. Each master node MUST have AT LEAST 3 slave nodes and AT MOST 8. The roadmap must be COMPREHENSIVE — cover the ENTIRE skill from fundamentals to advanced topics.
+4. IMPORTANT: The roadmap should cover ALL major areas of the skill. Every master node must be a DISTINCT, DIFFERENT topic area. Do NOT skip major areas.
+
+### ZERO REPETITION — THIS IS CRITICAL
+5. EVERY master node title and every slave node title must be COMPLETELY UNIQUE. No two master nodes may cover similar topics.
+
+**FORBIDDEN patterns (instant failure if you do this):**
+   - "Advanced X Topics" + "X Best Practices" + "Advanced X Topics and Best Practices" ← this is padding with near-duplicates
+   - "Redux and React Integration" + "Advanced Redux and React Topics" ← too similar
+   - Having multiple master nodes that all say "best practices" or "advanced" ← merge them into one
+   - Slave nodes like "Handling Complex State Management Scenarios" repeated across different masters
+
+**GOOD pattern:** Each master node covers a clearly different AREA:
+   - For Redux: "Core Concepts (Store, Actions, Reducers)" → "Middleware and Async" → "Redux Toolkit" → "React-Redux Hooks" → "State Normalization" → "Testing Redux" → "Performance Optimization" → "Real-World Patterns"
 
 ### Granularity — THIS IS THE MOST IMPORTANT RULE
 5. Each slave node must teach a SINGLE, SPECIFIC concept — not an entire subject area. Think "one lesson" not "one course".

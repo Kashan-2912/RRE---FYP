@@ -1,6 +1,6 @@
 /**
  * Live Search Service – performs real-time, concept-specific searches
- * using YouTube Data API + Serper.dev (Google Search API).
+ * using Serper.dev (Google Search + Video Search APIs).
  *
  * This replaces the old pre-crawl + embedding approach with targeted
  * live searches for each slave node's specific topic.
@@ -20,84 +20,55 @@ export interface LiveResource {
   snippet: string | null;
 }
 
-// ── YouTube Search ─────────────────────────────────────────
+// ── Serper Video Search ────────────────────────────────────
 
 /**
- * Search YouTube for videos matching a specific query.
- * Returns focused, topic-specific video results.
+ * Search for videos using Serper.dev's /videos endpoint.
+ * Returns YouTube and other platform video results.
  */
-async function searchYouTube(
+async function searchVideos(
   query: string,
-  maxResults: number = 3
+  maxResults: number = 5
 ): Promise<LiveResource[]> {
-  const apiKey = config.youtubeApiKey;
+  const apiKey = config.serperApiKey;
   if (!apiKey) {
-    console.warn("   ⚠️ YOUTUBE_API_KEY not set, skipping YouTube search");
+    console.warn("   ⚠️ SERPER_API_KEY not set, skipping video search");
     return [];
   }
 
   try {
-    const response = await axios.get(
-      "https://www.googleapis.com/youtube/v3/search",
+    const response = await axios.post(
+      "https://google.serper.dev/videos",
       {
-        params: {
-          key: apiKey,
-          q: query,
-          part: "snippet",
-          type: "video",
-          maxResults: maxResults + 2, // fetch extra in case of dedup
-          order: "relevance",
-          relevanceLanguage: "en",
+        q: query,
+        num: maxResults,
+      },
+      {
+        headers: {
+          "X-API-KEY": apiKey,
+          "Content-Type": "application/json",
         },
         timeout: 10000,
       }
     );
 
-    const items = response.data?.items || [];
+    const videos = response.data?.videos || [];
 
-    // Get video durations in a batch call
-    const videoIds = items.map((item: any) => item.id.videoId).join(",");
-    let durations: Record<string, string> = {};
-
-    if (videoIds) {
-      try {
-        const detailsResponse = await axios.get(
-          "https://www.googleapis.com/youtube/v3/videos",
-          {
-            params: {
-              key: apiKey,
-              id: videoIds,
-              part: "contentDetails",
-            },
-            timeout: 10000,
-          }
-        );
-
-        for (const video of detailsResponse.data?.items || []) {
-          durations[video.id] = parseISO8601Duration(
-            video.contentDetails.duration
-          );
-        }
-      } catch {
-        // Duration fetch failed, continue without durations
-      }
-    }
-
-    return items.map((item: any) => ({
-      title: decodeHtmlEntities(item.snippet.title),
-      url: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+    return videos.map((v: any) => ({
+      title: decodeHtmlEntities(v.title || ""),
+      url: v.link,
       type: "video" as const,
-      source: "YouTube",
-      duration: durations[item.id.videoId] || null,
-      snippet: item.snippet.description?.slice(0, 200) || null,
+      source: extractDomain(v.link),
+      duration: v.duration || null,
+      snippet: v.snippet?.slice(0, 200) || null,
     }));
   } catch (err: any) {
-    console.error(`   ⚠️ YouTube search failed for "${query}": ${err.message}`);
+    console.error(`   ⚠️ Video search failed for "${query}": ${err.message}`);
     return [];
   }
 }
 
-// ── Serper.dev (Google Search) ─────────────────────────────
+// ── Serper Web Search ──────────────────────────────────────
 
 /**
  * Search Google via Serper.dev for articles, docs, tutorials.
@@ -157,67 +128,70 @@ export interface SlaveNodeSearchInput {
  * Search for resources for a single slave node.
  * Guarantees at least 1 video result. Returns deduplicated, ranked results.
  *
- * @param usedUrls - Set of URLs already used in previous nodes (for global dedup)
+ * @param usedUrls - Set of URLs already used in previous nodes (strict global dedup — NO duplicates at all)
  */
 export async function searchResourcesForNode(
   node: SlaveNodeSearchInput,
   usedUrls: Set<string>,
   maxResources: number = 3
 ): Promise<LiveResource[]> {
-  // Use the first search term for primary search
-  const primaryQuery = node.searchTerms[0] || node.title;
-  const secondaryQuery = node.searchTerms[1] || node.title;
+  // Use the node TITLE for video search (most specific) and search terms for web search
+  const videoQuery = node.title + " tutorial";
+  const webQuery = node.searchTerms[0] || node.title;
 
-  // Run YouTube and Google searches in parallel
-  const [youtubeResults, googleResults] = await Promise.all([
-    searchYouTube(primaryQuery, 4),
-    searchGoogle(secondaryQuery, 5),
+  // Run video and web searches in parallel
+  const [videoResults, webResults] = await Promise.all([
+    searchVideos(videoQuery, 6),
+    searchGoogle(webQuery, 5),
   ]);
 
-  // Deduplicate: remove URLs already used in other slave nodes
-  const allResults: LiveResource[] = [];
+  // Strict global dedup — no resource appears in more than one slave node
+  const availableVideos: LiveResource[] = [];
+  const availableNonVideos: LiveResource[] = [];
   const seenUrls = new Set<string>();
 
-  // Add YouTube results first (videos are priority)
-  for (const result of youtubeResults) {
+  for (const result of videoResults) {
     const normalized = normalizeUrl(result.url);
     if (!usedUrls.has(normalized) && !seenUrls.has(normalized)) {
       seenUrls.add(normalized);
-      allResults.push(result);
+      availableVideos.push(result);
     }
   }
 
-  // Add Google results (articles, docs, tutorials)
-  for (const result of googleResults) {
+  for (const result of webResults) {
     const normalized = normalizeUrl(result.url);
     if (!usedUrls.has(normalized) && !seenUrls.has(normalized)) {
       seenUrls.add(normalized);
-      allResults.push(result);
+      // Web results that are actually videos go to video pool
+      if (result.type === "video") {
+        availableVideos.push(result);
+      } else {
+        availableNonVideos.push(result);
+      }
     }
   }
 
-  // Enforce: at least 1 video, then fill with variety
-  const videos = allResults.filter((r) => r.type === "video");
-  const nonVideos = allResults.filter((r) => r.type !== "video");
-
+  // Build final selection: 1 video (guaranteed) + mix of other types
   const selected: LiveResource[] = [];
 
   // Always include at least 1 video
-  if (videos.length > 0) {
-    selected.push(videos[0]);
+  if (availableVideos.length > 0) {
+    selected.push(availableVideos[0]);
   }
 
-  // Fill remaining slots with non-videos for variety, then more videos
-  const remaining = maxResources - selected.length;
-  const pool = [...nonVideos, ...videos.slice(1)];
-  for (const item of pool) {
+  // Fill with non-videos for variety
+  for (const item of availableNonVideos) {
     if (selected.length >= maxResources) break;
-    if (!selected.includes(item)) {
-      selected.push(item);
-    }
+    selected.push(item);
   }
 
-  // Mark these URLs as used
+  // If still have room, add more videos
+  for (const item of availableVideos.slice(1)) {
+    if (selected.length >= maxResources) break;
+    selected.push(item);
+  }
+
+  // Mark ALL selected URLs as used globally
   for (const r of selected) {
     usedUrls.add(normalizeUrl(r.url));
   }
