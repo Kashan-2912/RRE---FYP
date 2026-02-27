@@ -83,10 +83,10 @@ function buildRoadmapPrompt(input: RoadmapUserInput): string {
     return mapped[p] || p;
   }).join(", ");
 
-  return `You are an expert curriculum designer and technical educator with deep knowledge across all technology domains. Your job is to design a comprehensive, structured learning roadmap.
+  return `You are a world-class curriculum designer who creates detailed, progressive learning paths. You specialize in breaking complex skills into small, digestible learning units that build on each other organically — from the simplest atomic concept to advanced mastery.
 
 ## TASK
-Create a detailed learning roadmap for the skill: "${input.skill}"
+Create a comprehensive, granular learning roadmap for: "${input.skill}"
 
 ## LEARNER PROFILE
 - **Proficiency Score**: ${input.proficiencyScore}/10 — ${proficiencyContext}
@@ -95,56 +95,66 @@ Create a detailed learning roadmap for the skill: "${input.skill}"
 - **Session Length**: ${input.sessionLength} — ${sessionMap[input.sessionLength] || ""}
 - **Preferred Content Types**: ${contentPrefsStr}
 
-## ROADMAP STRUCTURE RULES
+## CRITICAL RULES FOR ROADMAP QUALITY
 
-1. **Master Nodes** represent major topic areas/milestones in the learning journey. They MUST be ordered sequentially — a learner should complete Master Node 1 before moving to Master Node 2, etc.
+### Structure
+1. **Master Nodes** = major milestones/phases in the learning journey, ordered sequentially. A learner completes phase 1 before phase 2.
+2. **Slave Nodes** = specific, atomic concepts within each phase. Each slave node teaches ONE focused thing.
+3. Use 4-12 master nodes depending on skill breadth. Use 2-8 slave nodes per master node depending on topic complexity. VARY these counts naturally.
 
-2. **Slave Nodes** are specific sub-concepts within each Master Node. Each slave node represents one focused learning unit.
+### Granularity — THIS IS THE MOST IMPORTANT RULE
+4. Each slave node must teach a SINGLE, SPECIFIC concept — not an entire subject area. Think "one lesson" not "one course".
 
-3. The roadmap must be specifically tailored to "${input.skill}" — not a generic template. Use real, specific topic names, frameworks, tools, and concepts that are actually part of learning this skill.
+**BAD slave node examples (too broad):**
+   - "What is ${input.skill}?" ← too vague, teach specific things instead
+   - "Introduction to ${input.skill}" ← this is a course, not a concept
+   - "Core Concepts" ← break these into individual concepts
+   - "Setting up the environment" ← break into: install runtime, install CLI, create first project
 
-4. The number of master nodes should vary based on the skill's breadth and the learner's proficiency. Use between 4 and 12 master nodes. Broader skills (e.g., "Web Development") need more master nodes; narrower skills (e.g., "CSS Grid") need fewer. Lower proficiency = more nodes to cover fundamentals. Higher proficiency = fewer but deeper nodes.
+**GOOD slave node examples (specific and atomic):**
+   - For React: "JSX Syntax and Expressions", "Creating Functional Components", "useState for Local State", "Conditional Rendering with Ternaries"
+   - For NestJS: "Decorators in TypeScript", "Creating Your First Controller", "Dependency Injection Basics", "Route Parameters and Query Strings"
+   - For Python: "Variables and Data Types", "List Comprehensions", "Dictionary Methods", "Try/Except Error Handling"
 
-5. Each master node should have between 2 and 8 slave nodes, depending on how complex that topic area is. Some master nodes may need only 2-3 slave nodes if the topic is narrow, others may need 6-8 if the topic is broad. Vary the count naturally — don't make every master node have the same number.
+5. Build from SMALL to BIG. The first master node should start with the smallest possible concept, not an overview. For example:
+   - For React: Start with "What is JSX?" not "Introduction to React"
+   - For NestJS: Start with "TypeScript Decorators" or "What are modules?" not "What is NestJS?"
 
-6. Slave node titles should be specific and searchable (e.g., "React useState Hook" not just "State"). These titles will be used to search for real learning resources, so make them specific enough to find relevant content.
+### Search Terms
+6. Each slave node's searchTerms must be UNIQUE and SPECIFIC to that exact concept. They will be used to find focused resources, NOT full courses.
 
-7. Each slave node must specify:
-   - A clear, specific title
-   - A 1-2 sentence description of what the learner will understand after completing this node
-   - The difficulty level (beginner/intermediate/advanced/expert)
-   - Which content types are most useful for this specific concept (from the learner's preferences: ${input.contentPreferences.join(", ")})
-   - 2-3 specific search terms that would find the best resources for this concept (e.g., "React useEffect tutorial beginner", "CSS Grid layout guide")
+**BAD search terms:** "${input.skill} full course", "${input.skill} tutorial for beginners", "learn ${input.skill}"
+**GOOD search terms:** "${input.skill} decorators explained", "${input.skill} dependency injection tutorial", "${input.skill} middleware how to create"
 
-8. Search terms must be:
-   - Specific to the concept (not generic like "learn programming")
-   - Include the technology/skill name
-   - Mix of tutorial-focused and concept-focused queries
-   - Appropriate for the difficulty level
+7. Search terms should find SHORT, FOCUSED content (a single blog post about one topic, a 10-minute YouTube video on one concept) — NOT long comprehensive courses.
 
-9. The roadmap should have a logical progression where later nodes build on earlier ones.
+### Progression
+8. Within each master node, slave nodes should progress from simpler to more complex.
+9. Later master nodes should build on concepts from earlier ones. Reference this in descriptions.
+10. Difficulty should progress naturally: early nodes mostly beginner, middle nodes intermediate, later nodes advanced.
 
-10. Provide a brief overall summary of the roadmap and an estimated total learning time in hours.
+### Content Variety
+11. Distribute content types across slave nodes. Don't assign the same contentTypes to every node. Some concepts are better learned through video, others through documentation, others by reading code.
 
 ## RESPONSE FORMAT
-You MUST respond with ONLY a valid JSON object (no markdown, no code fences, no extra text). The JSON must strictly follow this schema:
+Respond with ONLY valid JSON (no markdown, no code fences). Schema:
 
 {
-  "skill": "string — the skill name",
-  "summary": "string — 2-3 sentence overview of what this roadmap covers and the learning journey",
+  "skill": "string",
+  "summary": "string — 2-3 sentence overview of the learning journey",
   "estimatedTotalHours": number,
   "masterNodes": [
     {
-      "title": "string — major topic area name",
-      "description": "string — what this master node covers and why it's important",
-      "order": number (starting from 1),
+      "title": "string — phase/milestone name",
+      "description": "string — what this phase covers and why",
+      "order": number,
       "slaveNodes": [
         {
           "title": "string — specific concept name",
-          "description": "string — what the learner will understand after this",
+          "description": "string — what the learner will understand after this single lesson",
           "difficulty": "beginner" | "intermediate" | "advanced" | "expert",
-          "contentTypes": ["array of preferred content types for this concept"],
-          "searchTerms": ["array of 2-3 specific search queries"]
+          "contentTypes": ["1-2 content types best suited for THIS specific concept"],
+          "searchTerms": ["2-3 UNIQUE search queries specific to this exact concept"]
         }
       ]
     }

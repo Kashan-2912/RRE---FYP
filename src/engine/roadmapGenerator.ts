@@ -59,12 +59,15 @@ export interface RoadmapOutput {
  *   1. Tag-based text search (fast, precise)
  *   2. Semantic vector search using search terms (more flexible)
  * Then rank and deduplicate results.
+ * 
+ * @param usedResourceIds - Set of resource IDs already assigned to other nodes (for global dedup)
  */
 async function findResourcesForSlaveNode(
   slaveNode: SlaveNodeSkeleton,
   skill: string,
   contentPreferences: string[],
-  maxResources: number = 3
+  maxResources: number = 3,
+  usedResourceIds: Set<string> = new Set()
 ): Promise<ResourceAttachment[]> {
   const allResults: Map<string, ResourceAttachment & { score: number }> = new Map();
 
@@ -100,11 +103,11 @@ async function findResourcesForSlaveNode(
        LIMIT $3`,
       [skillTag],
       dbTypes.length > 0 ? dbTypes : [],
-      maxResources * 2
+      maxResources * 4 // Fetch extra to account for dedup filtering
     );
 
     for (const row of tagResults) {
-      if (!allResults.has(row.id)) {
+      if (!allResults.has(row.id) && !usedResourceIds.has(row.id)) {
         allResults.set(row.id, {
           id: row.id,
           title: row.title,
@@ -126,14 +129,14 @@ async function findResourcesForSlaveNode(
   try {
     for (const searchTerm of slaveNode.searchTerms.slice(0, 2)) {
       const embedding = await generateEmbedding(searchTerm);
-      const results = await searchSimilarResources(embedding, maxResources * 2);
+      const results = await searchSimilarResources(embedding, maxResources * 4);
 
       for (const result of results) {
         const existing = allResults.get(result.id);
         if (existing) {
           // Boost score if found by both methods
           existing.score = Math.max(existing.score, result.similarity);
-        } else {
+        } else if (!usedResourceIds.has(result.id)) {
           allResults.set(result.id, {
             id: result.id,
             title: result.title,
@@ -226,6 +229,8 @@ export async function generateRoadmap(
   console.log(`\n📚 Attaching resources from database (${resourceCheck.count} available)...`);
 
   // Step 3: Attach resources to each slave node
+  // Track used resource IDs globally so no resource appears in more than one slave node
+  const usedResourceIds = new Set<string>();
   let totalResourcesAttached = 0;
   let totalSlaveNodes = 0;
 
@@ -241,8 +246,14 @@ export async function generateRoadmap(
         slaveNode,
         input.skill,
         input.contentPreferences,
-        3 // max resources per slave node
+        3, // max resources per slave node
+        usedResourceIds
       );
+
+      // Mark these resources as used so they won't appear in subsequent nodes
+      for (const r of resources) {
+        usedResourceIds.add(r.id);
+      }
 
       totalResourcesAttached += resources.length;
 
