@@ -4,6 +4,7 @@ import rateLimit from "express-rate-limit";
 import { config } from "./config/environment";
 import { recommendationRouter } from "./api/recommendations";
 import { userProfileRouter } from "./api/userProfileRouter";
+import { roadmapRouter } from "./api/roadmapRouter";
 
 const app = express();
 
@@ -24,6 +25,7 @@ app.use(limiter);
 // ── Routes ─────────────────────────────────────────────────
 app.use("/api", recommendationRouter);
 app.use("/api", userProfileRouter);
+app.use("/api", roadmapRouter);
 
 // Health check
 app.get("/health", (_req, res) => {

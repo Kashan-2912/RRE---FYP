@@ -22,4 +22,8 @@ export const config = {
   // Embedding model config
   embeddingModel: "Xenova/all-MiniLM-L6-v2",
   embeddingDimension: 384,
+
+  // LLM config (Google Gemini)
+  llmApiKey: process.env.LLM_API_KEY || "",
+  llmModel: process.env.LLM_MODEL || "gemini-2.0-flash",
 } as const;
