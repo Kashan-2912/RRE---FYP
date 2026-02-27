@@ -163,21 +163,69 @@ async function findResourcesForSlaveNode(
   return sorted.slice(0, maxResources).map(({ score, ...resource }) => resource);
 }
 
+// ── Auto-Ingest Logic ──────────────────────────────────────
+
+import { buildDatasetForSkill } from "../resources/datasetBuilder";
+
+const MIN_RESOURCES_THRESHOLD = 5; // Minimum resources needed before we skip ingestion
+
+/**
+ * Check if the database has enough resources for a given skill.
+ * If not, auto-crawl and ingest resources for that skill.
+ */
+async function ensureResourcesExist(
+  skill: string,
+  sessionLength: string
+): Promise<{ existed: boolean; count: number }> {
+  const skillTag = skill.toLowerCase().trim();
+
+  // Count how many resources we have for this skill
+  const countResult: any[] = await prisma.$queryRawUnsafe(
+    `SELECT COUNT(*) as count FROM resources WHERE tags && $1::text[]`,
+    [skillTag]
+  );
+  const existingCount = parseInt(countResult[0]?.count || "0");
+
+  if (existingCount >= MIN_RESOURCES_THRESHOLD) {
+    console.log(`   ✅ Found ${existingCount} existing resources for "${skill}" — using cached`);
+    return { existed: true, count: existingCount };
+  }
+
+  // Not enough resources — auto-crawl
+  console.log(`\n🕷️  Only ${existingCount} resources found for "${skill}" — auto-ingesting...`);
+  const result = await buildDatasetForSkill(skill, 15, sessionLength);
+  const totalNow = existingCount + result.ingested;
+  console.log(`   ✅ Auto-ingestion complete: ${result.ingested} new resources (${totalNow} total)`);
+
+  return { existed: false, count: totalNow };
+}
+
 // ── Main Generator ─────────────────────────────────────────
 
 /**
  * Generate a complete roadmap with resources attached.
+ *
+ * Flow:
+ *   1. Check if DB has resources for this skill (auto-ingest if not)
+ *   2. Call LLM for roadmap skeleton (runs in parallel with ingestion if needed)
+ *   3. Attach real resources to each slave node
+ *   4. Return the complete roadmap
  */
 export async function generateRoadmap(
   input: RoadmapUserInput
 ): Promise<RoadmapOutput> {
   console.log(`\n📋 Starting roadmap generation for: ${input.skill}`);
 
-  // Step 1: Get roadmap skeleton from LLM
-  const skeleton = await generateRoadmapFromLLM(input);
+  // Step 1 & 2: Run LLM call and resource check/ingestion in PARALLEL
+  // This saves time — the LLM call takes a few seconds, and so does crawling
+  const [skeleton, resourceCheck] = await Promise.all([
+    generateRoadmapFromLLM(input),
+    ensureResourcesExist(input.skill, input.sessionLength),
+  ]);
 
-  // Step 2: Attach resources to each slave node
-  console.log(`\n📚 Attaching resources from database...`);
+  console.log(`\n📚 Attaching resources from database (${resourceCheck.count} available)...`);
+
+  // Step 3: Attach resources to each slave node
   let totalResourcesAttached = 0;
   let totalSlaveNodes = 0;
 
@@ -217,7 +265,8 @@ export async function generateRoadmap(
     });
   }
 
-  console.log(`\n✅ Roadmap complete: ${masterNodes.length} master nodes, ${totalSlaveNodes} slave nodes, ${totalResourcesAttached} resources attached\n`);
+  console.log(`\n✅ Roadmap complete: ${masterNodes.length} master nodes, ${totalSlaveNodes} slave nodes, ${totalResourcesAttached} resources attached`);
+  console.log(`   ${resourceCheck.existed ? "📦 Used cached resources" : "🆕 Fresh resources were auto-crawled"}\n`);
 
   return {
     skill: skeleton.skill,
@@ -232,3 +281,4 @@ export async function generateRoadmap(
     },
   };
 }
+
