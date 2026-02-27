@@ -23,7 +23,10 @@ export const config = {
   embeddingModel: "Xenova/all-MiniLM-L6-v2",
   embeddingDimension: 384,
 
-  // LLM config (Google Gemini)
+  // LLM config (Groq)
   llmApiKey: process.env.LLM_API_KEY || "",
-  llmModel: process.env.LLM_MODEL || "gemini-2.0-flash",
+  llmModel: process.env.LLM_MODEL || "llama-3.3-70b-versatile",
+
+  // Live search (Serper.dev – Google Search API)
+  serperApiKey: process.env.SERPER_API_KEY || "",
 } as const;

@@ -100,10 +100,11 @@ Create a comprehensive, granular learning roadmap for: "${input.skill}"
 ### Structure
 1. **Master Nodes** = major milestones/phases in the learning journey, ordered sequentially. A learner completes phase 1 before phase 2.
 2. **Slave Nodes** = specific, atomic concepts within each phase. Each slave node teaches ONE focused thing.
-3. Use 4-12 master nodes depending on skill breadth. Use 2-8 slave nodes per master node depending on topic complexity. VARY these counts naturally.
+3. You MUST generate AT LEAST 6 master nodes and AT MOST 12. Each master node MUST have AT LEAST 3 slave nodes and AT MOST 8. The roadmap must be COMPREHENSIVE — cover the ENTIRE skill from fundamentals to advanced topics, not just a handful of concepts.
+4. IMPORTANT: The roadmap should cover ALL major areas of the skill. For example, for NextJS you must cover: project setup, pages/routing, components, data fetching, SSR/SSG/ISR, API routes, styling, middleware, authentication, deployment, testing, performance, etc. Do NOT skip major areas.
 
 ### Granularity — THIS IS THE MOST IMPORTANT RULE
-4. Each slave node must teach a SINGLE, SPECIFIC concept — not an entire subject area. Think "one lesson" not "one course".
+5. Each slave node must teach a SINGLE, SPECIFIC concept — not an entire subject area. Think "one lesson" not "one course".
 
 **BAD slave node examples (too broad):**
    - "What is ${input.skill}?" ← too vague, teach specific things instead
@@ -116,25 +117,25 @@ Create a comprehensive, granular learning roadmap for: "${input.skill}"
    - For NestJS: "Decorators in TypeScript", "Creating Your First Controller", "Dependency Injection Basics", "Route Parameters and Query Strings"
    - For Python: "Variables and Data Types", "List Comprehensions", "Dictionary Methods", "Try/Except Error Handling"
 
-5. Build from SMALL to BIG. The first master node should start with the smallest possible concept, not an overview. For example:
+6. Build from SMALL to BIG. The first master node should start with the smallest possible concept, not an overview. For example:
    - For React: Start with "What is JSX?" not "Introduction to React"
    - For NestJS: Start with "TypeScript Decorators" or "What are modules?" not "What is NestJS?"
 
 ### Search Terms
-6. Each slave node's searchTerms must be UNIQUE and SPECIFIC to that exact concept. They will be used to find focused resources, NOT full courses.
+7. Each slave node's searchTerms must be UNIQUE and SPECIFIC to that exact concept. They will be used to find focused resources, NOT full courses.
 
 **BAD search terms:** "${input.skill} full course", "${input.skill} tutorial for beginners", "learn ${input.skill}"
 **GOOD search terms:** "${input.skill} decorators explained", "${input.skill} dependency injection tutorial", "${input.skill} middleware how to create"
 
-7. Search terms should find SHORT, FOCUSED content (a single blog post about one topic, a 10-minute YouTube video on one concept) — NOT long comprehensive courses.
+8. Search terms should find SHORT, FOCUSED content (a single blog post about one topic, a 10-minute YouTube video on one concept) — NOT long comprehensive courses.
 
 ### Progression
-8. Within each master node, slave nodes should progress from simpler to more complex.
-9. Later master nodes should build on concepts from earlier ones. Reference this in descriptions.
-10. Difficulty should progress naturally: early nodes mostly beginner, middle nodes intermediate, later nodes advanced.
+9. Within each master node, slave nodes should progress from simpler to more complex.
+10. Later master nodes should build on concepts from earlier ones. Reference this in descriptions.
+11. Difficulty should progress naturally: early nodes mostly beginner, middle nodes intermediate, later nodes advanced.
 
 ### Content Variety
-11. Distribute content types across slave nodes. Don't assign the same contentTypes to every node. Some concepts are better learned through video, others through documentation, others by reading code.
+12. Distribute content types across slave nodes. Don't assign the same contentTypes to every node. Some concepts are better learned through video, others through documentation, others by reading code.
 
 ## RESPONSE FORMAT
 Respond with ONLY valid JSON (no markdown, no code fences). Schema:
@@ -201,7 +202,7 @@ export async function generateRoadmapFromLLM(
           },
         ],
         temperature: 0.7,
-        max_tokens: 8192,
+        max_tokens: 16384,
         response_format: { type: "json_object" },
       },
       {
