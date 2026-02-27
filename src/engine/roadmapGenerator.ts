@@ -82,15 +82,17 @@ export async function generateRoadmap(
     for (const slaveNode of masterNode.slaveNodes) {
       totalSlaveNodes++;
 
-      // Live search — YouTube + Google for this specific concept
+      // Live search — Serper video + web for this specific concept
       const liveResults = await searchResourcesForNode(
         {
           title: slaveNode.title,
           searchTerms: slaveNode.searchTerms,
           contentTypes: slaveNode.contentTypes,
+          difficulty: slaveNode.difficulty,
         },
+        input.skill,
         usedUrls,
-        3 // max resources per node
+        5 // max resources per node (actual count varies based on availability)
       );
 
       const resources: ResourceAttachment[] = liveResults.map((r) => ({

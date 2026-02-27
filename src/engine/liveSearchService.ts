@@ -122,30 +122,35 @@ export interface SlaveNodeSearchInput {
   title: string;
   searchTerms: string[];
   contentTypes: string[];
+  difficulty: string;
 }
 
 /**
  * Search for resources for a single slave node.
  * Guarantees at least 1 video result. Returns deduplicated, ranked results.
  *
- * @param usedUrls - Set of URLs already used in previous nodes (strict global dedup — NO duplicates at all)
+ * @param skill - The main skill name (e.g., "Redux") for search context
+ * @param usedUrls - Set of URLs already used in previous nodes (strict global dedup)
  */
 export async function searchResourcesForNode(
   node: SlaveNodeSearchInput,
+  skill: string,
   usedUrls: Set<string>,
   maxResources: number = 3
 ): Promise<LiveResource[]> {
-  // Use the node TITLE for video search (most specific) and search terms for web search
-  const videoQuery = node.title + " tutorial";
-  const webQuery = node.searchTerms[0] || node.title;
+  // ALWAYS include skill name + difficulty for relevancy context
+  const diffLabel = node.difficulty === "expert" ? "advanced" : node.difficulty;
+  const videoQuery = `${skill} ${node.title} ${diffLabel} tutorial`;
+  const webQuery = `${skill} ${node.searchTerms[0] || node.title} ${diffLabel} tutorial OR guide`;
 
   // Run video and web searches in parallel
   const [videoResults, webResults] = await Promise.all([
-    searchVideos(videoQuery, 6),
+    searchVideos(videoQuery, 8), // fetch more video candidates for dedup survival
     searchGoogle(webQuery, 5),
   ]);
 
   // Strict global dedup — no resource appears in more than one slave node
+  // ONLY results from /videos endpoint are real videos
   const availableVideos: LiveResource[] = [];
   const availableNonVideos: LiveResource[] = [];
   const seenUrls = new Set<string>();
@@ -162,31 +167,30 @@ export async function searchResourcesForNode(
     const normalized = normalizeUrl(result.url);
     if (!usedUrls.has(normalized) && !seenUrls.has(normalized)) {
       seenUrls.add(normalized);
-      // Web results that are actually videos go to video pool
-      if (result.type === "video") {
-        availableVideos.push(result);
-      } else {
-        availableNonVideos.push(result);
-      }
+      // Web search results are ALWAYS non-video (articles, docs, tutorials)
+      // Only the /videos endpoint gives real video content
+      availableNonVideos.push({ ...result, type: result.type === "video" ? "article" : result.type });
     }
   }
 
-  // Build final selection: 1 video (guaranteed) + mix of other types
+  // Build final selection: ~60% real videos from /videos endpoint
   const selected: LiveResource[] = [];
+  const maxVideos = Math.ceil(maxResources * 0.6); // 60% videos
 
-  // Always include at least 1 video
-  if (availableVideos.length > 0) {
-    selected.push(availableVideos[0]);
+  // Add real videos first (from /videos endpoint only)
+  for (const item of availableVideos) {
+    if (selected.length >= maxVideos) break;
+    selected.push(item);
   }
 
-  // Fill with non-videos for variety
+  // Fill remaining with articles/docs
   for (const item of availableNonVideos) {
     if (selected.length >= maxResources) break;
     selected.push(item);
   }
 
   // If still have room, add more videos
-  for (const item of availableVideos.slice(1)) {
+  for (const item of availableVideos.slice(maxVideos)) {
     if (selected.length >= maxResources) break;
     selected.push(item);
   }
@@ -260,9 +264,8 @@ function extractDomain(url: string): string {
 
 function classifyUrl(url: string, title: string): LiveResource["type"] {
   const lower = url.toLowerCase();
-  const titleLower = title.toLowerCase();
 
-  if (lower.includes("youtube.com") || lower.includes("youtu.be")) return "video";
+  if (lower.includes("youtube.com") || lower.includes("youtu.be") || lower.includes("dailymotion") || lower.includes("vimeo.com")) return "video";
   if (lower.includes("github.com")) return "repo";
   if (
     lower.includes("docs.") ||
@@ -271,12 +274,6 @@ function classifyUrl(url: string, title: string): LiveResource["type"] {
     lower.includes("developer.mozilla.org") ||
     lower.includes("devdocs.io")
   ) return "documentation";
-  if (
-    titleLower.includes("tutorial") ||
-    titleLower.includes("how to") ||
-    titleLower.includes("step by step") ||
-    titleLower.includes("guide")
-  ) return "tutorial";
 
   return "article";
 }
