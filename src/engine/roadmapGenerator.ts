@@ -8,6 +8,7 @@
 
 import { generateRoadmapFromLLM, RoadmapUserInput } from "./llmService";
 import { searchResourcesForNode, LiveResource } from "./liveSearchService";
+import prisma from "../config/database";
 
 // ── Output Types ────────────────────────────────────────────
 
@@ -70,7 +71,8 @@ export async function generateRoadmap(
   // Step 2: Live search resources for each slave node
   console.log(`\n🔍 Live-searching resources for each concept...`);
 
-  const usedUrls = new Set<string>(); // Global dedup across all nodes
+  const usedVideoIds = new Set<string>();    // Dedup YouTube videos by video ID
+  const usedArticleUrls = new Set<string>(); // Dedup articles by normalized URL
   let totalResourcesAttached = 0;
   let totalSlaveNodes = 0;
 
@@ -82,7 +84,7 @@ export async function generateRoadmap(
     for (const slaveNode of masterNode.slaveNodes) {
       totalSlaveNodes++;
 
-      // Live search — Serper video + web for this specific concept
+      // Live search — YouTube API for videos + Serper for articles
       const liveResults = await searchResourcesForNode(
         {
           title: slaveNode.title,
@@ -91,8 +93,9 @@ export async function generateRoadmap(
           difficulty: slaveNode.difficulty,
         },
         input.skill,
-        usedUrls,
-        5 // max resources per node (actual count varies based on availability)
+        usedVideoIds,
+        usedArticleUrls,
+        5 // max resources per node
       );
 
       const resources: ResourceAttachment[] = liveResults.map((r) => ({
@@ -128,7 +131,20 @@ export async function generateRoadmap(
 
   console.log(`\n✅ Roadmap complete: ${masterNodes.length} master nodes, ${totalSlaveNodes} concepts, ${totalResourcesAttached} resources\n`);
 
-  return {
+  // Count total videos across entire roadmap
+  let totalVideos = 0;
+  let totalArticles = 0;
+  for (const mn of masterNodes) {
+    for (const sn of mn.slaveNodes) {
+      for (const r of sn.resources) {
+        if (r.type === "video") totalVideos++;
+        else totalArticles++;
+      }
+    }
+  }
+  console.log(`\n📊 ROADMAP VIDEO SUMMARY: ${totalVideos} videos / ${totalArticles} articles out of ${totalResourcesAttached} total (${Math.round(totalVideos / totalResourcesAttached * 100)}% videos)\n`);
+
+  const roadmapResult: RoadmapOutput = {
     skill: skeleton.skill,
     summary: skeleton.summary,
     estimatedTotalHours: skeleton.estimatedTotalHours,
@@ -140,4 +156,24 @@ export async function generateRoadmap(
       generatedAt: new Date().toISOString(),
     },
   };
+
+  // Save to database for inspection
+  try {
+    await prisma.generatedRoadmap.create({
+      data: {
+        skill: input.skill,
+        proficiencyScore: input.proficiencyScore,
+        totalMasterNodes: masterNodes.length,
+        totalSlaveNodes,
+        totalResources: totalResourcesAttached,
+        totalVideos,
+        roadmapData: roadmapResult as any,
+      },
+    });
+    console.log(`💾 Roadmap saved to database (${totalVideos} videos / ${totalResourcesAttached} total)`);
+  } catch (err: any) {
+    console.error(`⚠️ Failed to save roadmap to DB: ${err.message}`);
+  }
+
+  return roadmapResult;
 }

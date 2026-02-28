@@ -44,3 +44,17 @@ model UserProfile {
 
   @@map("user_profiles")
 }
+
+model GeneratedRoadmap {
+  id                String   @id @default(uuid())
+  skill             String
+  proficiencyScore  Float    @map("proficiency_score")
+  totalMasterNodes  Int      @map("total_master_nodes")
+  totalSlaveNodes   Int      @map("total_slave_nodes")
+  totalResources    Int      @map("total_resources")
+  totalVideos       Int      @map("total_videos")
+  roadmapData       Json     @map("roadmap_data") // Full roadmap JSON
+  createdAt         DateTime @default(now())
+
+  @@map("generated_roadmaps")
+}
