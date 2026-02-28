@@ -19,9 +19,6 @@ model Resource {
   tags            String[] // skill categories e.g. ["web-development", "react", "javascript"]
   source          String   // YouTube, GitHub, Medium, Dev.to, freeCodeCamp, MDN, etc.
   summary         String?  // AI-generated summary of the content
-  qualityScore    Float    @default(0.5)
-  popularityScore Float    @default(0.5)
-  recencyScore    Float    @default(0.5)
   embedding       Unsupported("vector(384)")? // pgvector embedding
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
