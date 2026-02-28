@@ -79,3 +79,51 @@ export function buildQueryText(params: {
 }): string {
   return `Learn ${params.skill}. Content types: ${params.contentPreferences.join(", ")}. Level: ${params.difficultyPreference}.`;
 }
+
+/**
+ * Build searchable text for a YouTube video resource.
+ * Used to generate the video's embedding vector.
+ */
+export function buildVideoText(video: {
+  title: string;
+  snippet?: string | null;
+  duration?: string | null;
+  difficulty?: string;
+  tags?: string[];
+}): string {
+  const parts = [video.title];
+  if (video.snippet) parts.push(video.snippet);
+  if (video.duration) parts.push(`duration: ${video.duration}`);
+  if (video.difficulty) parts.push(`level: ${video.difficulty}`);
+  if (video.tags?.length) parts.push(video.tags.join(", "));
+  return parts.join(". ");
+}
+
+/**
+ * Build a query text for semantic video search.
+ * Incorporates user preferences to find the best matching videos.
+ */
+export function buildVideoQueryText(params: {
+  skill: string;
+  concept: string;
+  difficulty: string;
+  sessionLength: string;
+  learningPace: string;
+}): string {
+  const durationHint =
+    params.sessionLength === "short"
+      ? "short video under 10 minutes"
+      : params.sessionLength === "dedicated"
+        ? "comprehensive video over 30 minutes"
+        : "medium length tutorial video";
+
+  const paceHint =
+    params.learningPace === "slow"
+      ? "beginner-friendly step-by-step explanation"
+      : params.learningPace === "fast"
+        ? "quick concise overview"
+        : "tutorial walkthrough";
+
+  return `${params.skill} ${params.concept}. ${params.difficulty} level. ${durationHint}. ${paceHint}.`;
+}
+

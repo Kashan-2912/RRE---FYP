@@ -84,7 +84,7 @@ export async function generateRoadmap(
     for (const slaveNode of masterNode.slaveNodes) {
       totalSlaveNodes++;
 
-      // Live search — YouTube API for videos + Serper for articles
+      // Live search — YouTube API (embedding-ranked) + Serper for articles
       const liveResults = await searchResourcesForNode(
         {
           title: slaveNode.title,
@@ -93,6 +93,10 @@ export async function generateRoadmap(
           difficulty: slaveNode.difficulty,
         },
         input.skill,
+        {
+          sessionLength: input.sessionLength,
+          learningPace: input.learningPace,
+        },
         usedVideoIds,
         usedArticleUrls,
         5 // max resources per node
